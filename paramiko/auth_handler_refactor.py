@@ -377,45 +377,41 @@ class AuthHandler:
         return pubkey_algo
 
     def _parse_service_accept(self, m):
-    """
-    Refactored version of the original long if/elif chain.
-    Uses a dispatch table and specialized helper methods.
-    Behavior is fully preserved.
-    """
-    service = m.get_text()
+    
+        service = m.get_text()
 
-    if service != "ssh-userauth":
-        self._log(DEBUG, f'Service request "{service}" accepted (?)')
-        return
+        if service != "ssh-userauth":
+            self._log(DEBUG, f'Service request "{service}" accepted (?)')
+            return
 
-    # Expected and valid service
-    self._log(DEBUG, "userauth is OK")
+        # Expected and valid service
+        self._log(DEBUG, "userauth is OK")
 
-    # Build the USERAUTH_REQUEST message
-    msg = Message()
-    msg.add_byte(cMSG_USERAUTH_REQUEST)
-    msg.add_string(self.username)
-    msg.add_string("ssh-connection")
-    msg.add_string(self.auth_method)
+        # Build the USERAUTH_REQUEST message
+        msg = Message()
+        msg.add_byte(cMSG_USERAUTH_REQUEST)
+        msg.add_string(self.username)
+        msg.add_string("ssh-connection")
+        msg.add_string(self.auth_method)
 
-    # Dispatch table for auth methods
-    handlers = {
-        "password": lambda: self._fill_auth_password(msg),
-        "publickey": lambda: self._fill_auth_publickey(msg),
-        "keyboard-interactive": lambda: self._fill_auth_keyboard_interactive(msg),
-        "gssapi-with-mic": lambda: self._fill_auth_gssapi_with_mic(msg),
-        "gssapi-keyex": lambda: self._fill_auth_gssapi_keyex(msg),
-        "none": lambda: None,  # no additional fields
-    }
+        # Dispatch table for auth methods
+        handlers = {
+            "password": lambda: self._fill_auth_password(msg),
+            "publickey": lambda: self._fill_auth_publickey(msg),
+            "keyboard-interactive": lambda: self._fill_auth_keyboard_interactive(msg),
+            "gssapi-with-mic": lambda: self._fill_auth_gssapi_with_mic(msg),
+            "gssapi-keyex": lambda: self._fill_auth_gssapi_keyex(msg),
+            "none": lambda: None,  # no additional fields
+        }
 
-    filler = handlers.get(self.auth_method, lambda: self._unknown_auth_method(msg))
-    result = filler()
+        filler = handlers.get(self.auth_method, lambda: self._unknown_auth_method(msg))
+        result = filler()
 
-    # If gssapi-with-mic returned None temporarily (due to multi-step exchange), don't send msg
-    if result == "STOP":
-        return
+        # If gssapi-with-mic returned None temporarily (due to multi-step exchange), don't send msg
+        if result == "STOP":
+            return
 
-    self.transport._send_message(msg)
+        self.transport._send_message(msg)
 
 def _unknown_auth_method(self, msg):
     raise SSHException(f'Unknown auth method "{self.auth_method}"')
